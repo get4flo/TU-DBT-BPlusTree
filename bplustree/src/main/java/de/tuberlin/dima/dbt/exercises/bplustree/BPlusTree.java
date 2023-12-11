@@ -1,5 +1,7 @@
 package de.tuberlin.dima.dbt.exercises.bplustree;
 
+import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.LinkedList;
 
@@ -33,20 +35,139 @@ public class BPlusTree {
             InnerNode innerNode = (InnerNode) node;
             if (parents != null) {
                 parents.push(innerNode);
+            } else{
+                parents = new ArrayDeque<InnerNode>();
+                parents.push(innerNode);
             }
             // TODO: traverse inner nodes to find leaf node
-            return null;
+
+            Node[] children = innerNode.getChildren();
+            int numberOfKeys = innerNode.keys.length;
+
+            int counter;
+            for(counter=0; counter<numberOfKeys; counter++){
+                if(innerNode.keys[counter] == null){
+                    break;
+                }
+                if(key < innerNode.keys[counter]){
+                    return findLeafNode(key, children[counter], parents);
+                }
+            }
+            return findLeafNode(key, children[counter], parents);
         }
     }
 
+    /**
+     * Lookup value in leaf node
+     * @return The stored value, or {null} if the key does not exist.
+     */
     private String lookupInLeafNode(Integer key, LeafNode node) {
-        // TODO: lookup value in leaf node
+        int numberOfKeys = node.keys.length;
+        for(int i=0; i<numberOfKeys; i++){
+            if(node.keys[i] == key){
+                return node.getValues()[i];
+            }
+        }
         return null;
     }
 
+    private void insertSort(Integer[] leafKeys, String[] values, Integer newKey, String newValue){
+        //make sure there is space
+        assert leafKeys[leafKeys.length -1] == null;
+
+        int position = 0;
+        for(int i=0; i<leafKeys.length; i++){
+            if(leafKeys[i] == null){
+                leafKeys[i] = newKey;
+                values[i] = newValue;
+                return;
+            }
+            if(leafKeys[i] > newKey){
+                position = i;
+                break;
+            }
+        }
+        //copy array to the right and discard last element of array
+        for(int i=leafKeys.length - 2; i >= position; i--){
+            leafKeys[i] = leafKeys[i - 1];
+            values[i] = values[i - 1];
+        }
+        //insert new key
+        leafKeys[position] = newKey;
+        values[position] = newValue;
+    }
+
+    private void insertSortNode(Integer[] NodeKeys, Node[] nodes, Integer newKey, Node newNode){
+        //make sure there is space
+        assert NodeKeys[NodeKeys.length -1] == null;
+
+        int position = 0;
+        for(int i=0; i<NodeKeys.length; i++){
+            if(NodeKeys[i] == null){
+                NodeKeys[i] = newKey;
+                nodes[i + 1] = newNode;
+                return;
+            }
+            if(NodeKeys[i] > newKey){
+                position = i;
+                break;
+            }
+        }
+        //copy array to the right and discard last element of array
+        for(int i=NodeKeys.length - 1; i > position; i--){
+            NodeKeys[i] = NodeKeys[i - 1];
+            nodes[i + 1] = nodes[i];
+        }
+        //insert new key
+        NodeKeys[position] = newKey;
+        nodes[position + 1] = newNode;
+    }
+
+    /**
+     * Insert value into leaf node (and propagate changes up)
+     */
     private void insertIntoLeafNode(Integer key, String value,
                                     LeafNode node, Deque<InnerNode> parents) {
-        // TODO: insert value into leaf node (and propagate changes up)
+        Integer[] leafKeys = node.getKeys();
+        int numberOfKeys = leafKeys.length;
+        if(leafKeys[numberOfKeys - 1] == null){
+            //space in leaf available
+            String []values = node.getValues();
+            insertSort(leafKeys, values, key, value);
+            node.setKeys(leafKeys);
+            node.setValues(values);
+        } else{
+            //no space in leaf available
+            //insert into oversize array first and split later
+            int oversize = numberOfKeys + 1;
+            Integer[] oversizeKeys = Arrays.copyOf(leafKeys, oversize);
+            String[] oversizeValues = Arrays.copyOf(node.getValues(), oversize);
+            insertSort(oversizeKeys, oversizeValues, key, value);
+
+            //get the middle info
+            int middle = (int) (oversize / 2);
+            Integer middleValue = oversizeKeys[middle];
+
+            //set initial leaf with lower half values
+            node.setKeys(Arrays.copyOfRange(oversizeKeys, 0, middle));
+            node.setValues(Arrays.copyOfRange(oversizeValues, 0, middle));
+
+            //create new Leaf from upper half
+            Integer []newKeys = Arrays.copyOfRange(oversizeKeys, middle, oversize);
+            String []newValues = Arrays.copyOfRange(oversizeValues, middle, oversize);
+            LeafNode newLeaf = new LeafNode(newKeys, newValues, numberOfKeys);
+
+            //add new Value to Inner Node
+            InnerNode parent = parents.getLast();
+            Node []children = parent.getChildren();
+            Integer []innerKeys = parent.getKeys();
+            insertSortNode(innerKeys, children, middleValue, newLeaf);
+
+            //set children and keys
+            parent.setChildren(children);
+            parent.setKeys(innerKeys);
+        }
+
     }
 
     private String deleteFromLeafNode(Integer key, LeafNode node,

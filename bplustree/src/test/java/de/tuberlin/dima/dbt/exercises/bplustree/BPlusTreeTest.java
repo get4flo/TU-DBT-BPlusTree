@@ -94,6 +94,23 @@ public class BPlusTreeTest {
                       newLeaf(keys(5, 6, 7), values("e", "f", "g")))))));
     }
 
+    @Test
+    public void splitLeafSortParent() {
+        // given
+        tree = newTree(newNode(keys(6),
+                               nodes(newLeaf(keys(1, 2, 3, 4), values("a", "b", "c", "d")),
+                                     newLeaf(keys(6, 7, 8),
+                                             values("f", "g", "h")))));
+        // when
+        tree.insert(5, "e");
+        // then
+        assertThat(tree, isTree(newTree(newNode(
+                keys(3, 6),
+                nodes(newLeaf(keys(1, 2), values("a", "b")),
+                      newLeaf(keys(3, 4, 5), values("c", "d", "e")),
+                      newLeaf(keys(6, 7, 8), values("f", "g", "h")))))));
+    }
+
     ///// Deletion tests
 
     @Test
