@@ -2,8 +2,11 @@ package de.tuberlin.dima.dbt.exercises.bplustree;
 
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 
 /**
  * Implementation of a B+ tree.
@@ -45,7 +48,7 @@ public class BPlusTree {
             int numberOfKeys = innerNode.keys.length;
 
             int counter;
-            for(counter=0; counter<numberOfKeys; counter++){
+            for(counter = 0; counter < numberOfKeys; counter++){
                 if(innerNode.keys[counter] == null){
                     break;
                 }
@@ -170,10 +173,154 @@ public class BPlusTree {
 
     }
 
+    private int getNodeOccupancy(Object[] keys){
+        int occupied = 0;
+        for(int i=0; i<keys.length; i++){
+            if(keys[i] != null){
+                occupied++;
+            }
+        }
+        return occupied;
+    }
+
+    private Integer getUpperBoundKey(Integer []keys, Integer key){
+        int occupancy = getNodeOccupancy(keys);
+        for(int i=0; i<occupancy; i++){
+            if(key < keys[i]){
+                return keys[i];
+            }
+        }
+        return null;
+    }
+
+    private Node getNeighbor(InnerNode parent, Integer key, boolean getRightNode){
+        Integer []innerNodeKeys = parent.getKeys();
+        Integer upperBound = getUpperBoundKey(innerNodeKeys, key);
+        boolean getLeftNode = !getRightNode;
+
+        //return null if there is no neighbor
+        if(upperBound == innerNodeKeys[0] && getLeftNode){
+            return null;
+        }
+        if(upperBound == null && getRightNode){
+            return null;
+        }
+
+        //with upperBound get Indexes of neighbors
+        int occupancy = getNodeOccupancy(innerNodeKeys);
+        Node []children = parent.getChildren();
+        for(int i=0; i<occupancy; i++){
+            if(innerNodeKeys[i] == upperBound){ 
+                if(getRightNode){
+                    return children[i + 1];
+                } else{
+                    return children[i - 1];
+                }
+            }
+        }
+        return null;
+    }
+
+    private void sortClean(LeafNode node){
+        HashMap<Integer, String> map = new HashMap<Integer, String>();
+        Integer []keys = node.getKeys();
+        String []values = node.getValues();
+
+        //add all key value pairs to hashmap
+        for(int i=0; i<keys.length; i++){
+            map.put(keys[i], values[i]);
+        }
+        //sort Hashmap
+        map.entrySet().stream().sorted(Map.Entry.<Integer, String>comparingByKey());
+
+        //extract keys and values and set keys and values
+        node.setKeys(Arrays.copyOf(map.keySet().toArray(), keys.length, Integer[].class));
+        node.setValues(Arrays.copyOf(map.values().toArray(), keys.length, String[].class));
+    }
+
     private String deleteFromLeafNode(Integer key, LeafNode node,
                                       Deque<InnerNode> parents) {
         // TODO: delete value from leaf node (and propagate changes up)
-        return null;
+        Integer[] leafKeys = node.getKeys();
+        int numberOfKeys = leafKeys.length;
+        int capacity = this.capacity;
+        String value = null;
+
+        int position = -1;
+        for(int i=0; i < leafKeys.length; i++){
+            if(leafKeys[i] == key){
+                position = i;
+                break;
+            }
+        }
+        if(position == -1){
+            return null;
+        }
+
+        Integer occupancy = getNodeOccupancy(leafKeys);
+        if(occupancy >= (capacity / 2) + 1){
+            //enough space in leaf available to just delete
+            String []values = node.getValues();
+
+            //get value
+            value = values[position];
+
+            //delete element
+            if(position != numberOfKeys - 1){
+                for(int i=position; i < numberOfKeys - 1; i++){
+                    leafKeys[i] = leafKeys[i + 1];
+                    values[i] = values[i + 1];
+                }
+            }
+            leafKeys[numberOfKeys - 1] = null;
+            values[numberOfKeys - 1] = null;
+        } else{
+            //not enough space so either steal or merge
+            InnerNode parent = parents.getLast();
+            LeafNode leftNeighbor = (LeafNode) getNeighbor(parent, key, false);
+            LeafNode rightNeighbor = (LeafNode) getNeighbor(parent, key, true);
+            
+            Integer leftOccupancy = leftNeighbor == null ? 0 : getNodeOccupancy(leftNeighbor.getKeys());
+            Integer rightOccupancy = rightNeighbor == null ? 0 : getNodeOccupancy(rightNeighbor.getKeys());
+            if(leftOccupancy > (capacity / 2)){
+                //we can steal from left
+            } else if(rightOccupancy > (capacity / 2)){
+                //we can steal from right
+                Integer []ownKeys = leafKeys;
+                Integer []neighborKeys = rightNeighbor.getKeys();
+
+                String []ownValues = node.getValues();
+                String []neighborValues = rightNeighbor.getValues();
+
+                //get Value
+                value = ownValues[position];
+
+                //overwrite position with lowest entry in neighbor
+                ownKeys[position] = neighborKeys[0];
+                ownValues[position] = neighborValues[0];
+                
+                //remove value from neighbor
+                neighborKeys[0] = null;
+                neighborValues[0] = null;
+
+                //set all values
+                node.setKeys(ownKeys);
+                node.setValues(ownValues);
+                rightNeighbor.setKeys(neighborKeys);
+                rightNeighbor.setValues(neighborValues);
+
+                //sort new arrays
+                sortClean(node);
+                sortClean(rightNeighbor);
+            } else if(rightNeighbor != null){
+                //merge with right neighbor
+            } else if(leftNeighbor != null){
+                //merge with left neighbor
+            }
+        }
+
+    
+        return value;
     }
 
     ///// Public API
