@@ -229,6 +229,7 @@ public class BPlusTree {
 
     private Node getNeighbor(InnerNode parent, Integer key, boolean getRightNode){
         Integer []innerNodeKeys = parent.getKeys();
+        //Node at position parent.getChildren[upperBound] isnode with key
         Integer upperBound = getUpperBoundKey(innerNodeKeys, key);
         boolean getLeftNode = !getRightNode;
 
@@ -252,6 +253,11 @@ public class BPlusTree {
                 }
             }
         }
+        //check for highest Node left Neighbor
+        if(upperBound == null && getLeftNode){
+            return children[occupancy - 1];
+        }
+        
         return null;
     }
 
@@ -320,7 +326,7 @@ public class BPlusTree {
             }
         }
         if(fromRightNode){
-            keys[position - 1] = newKey;
+            keys[position] = newKey;
         } else{
             keys[position] = newKey;
         }
@@ -364,22 +370,87 @@ public class BPlusTree {
 
         //delete key and right node
         Node[] children = parent.getChildren();
-        parentKeys[position] = null;
-        children[position + 1] = null;
-        parent.setChildren(children);
-
-        sortCleanInner(parent);
-
+        Integer parentOccupancy = getNodeOccupancy(parentKeys);
+        if(parentOccupancy == 1){
+            //merged last existing leafnodes -> set root
+            this.root = leftNode;
+        }else{
+            parentKeys[position] = null;
+            children[position + 1] = null;
+            parent.setChildren(children);
+    
+            sortCleanInner(parent);
+        }
     }
+
+    private void deletePositionOfAssociatedArrays(int position, Integer[] keys, String[] values){
+        //delete element
+        if(position != capacity - 1){
+            for(int i=position; i < capacity - 1; i++){
+                keys[i] = keys[i + 1];
+                values[i] = values[i + 1];
+            }
+        }
+        keys[capacity - 1] = null;
+        values[capacity - 1] = null;
+    }
+
+    private void stealFromNeighbor(Deque<InnerNode> parents, LeafNode thief, LeafNode victim, int deletePosition, boolean stealfromRight){
+        Integer []ownKeys = thief.getKeys();
+        Integer []neighborKeys = victim.getKeys();
+
+        String []ownValues = thief.getValues();
+        String []neighborValues = victim.getValues();
+
+        Integer tiefPosition = -1;
+        Integer victemOccupancy = getNodeOccupancy(victim.getKeys());
+        Integer[] copyOldLowerKeys = null;
+        if(stealfromRight){
+            tiefPosition = 0;
+            copyOldLowerKeys = Arrays.copyOf(ownKeys, this.capacity);
+        } else{
+            tiefPosition = victemOccupancy - 1;
+            copyOldLowerKeys = Arrays.copyOf(neighborKeys, this.capacity);
+        }
+        //overwrite position with entry from neighbor
+        Integer transferedKey = neighborKeys[tiefPosition];
+        ownKeys[deletePosition] = neighborKeys[tiefPosition];
+        ownValues[deletePosition] = neighborValues[tiefPosition];
+
+        //remove value from neighbor
+        neighborKeys[tiefPosition] = null;
+        neighborValues[tiefPosition] = null;
+
+        //set all values
+        thief.setKeys(ownKeys);
+        thief.setValues(ownValues);
+        victim.setKeys(neighborKeys);
+        victim.setValues(neighborValues);
+
+        //sort new arrays
+        sortClean(thief);
+        sortClean(victim);
+
+        //adapt parent
+        InnerNode parent = parents.getFirst();
+        Integer newParentKey = null;
+        if(stealfromRight){
+            newParentKey = neighborKeys[1];
+        } else{
+            newParentKey = transferedKey;
+        }
+        replaceParentKey(parent, copyOldLowerKeys, newParentKey, stealfromRight);
+    }
+
 
     private String deleteFromLeafNode(Integer key, LeafNode node,
                                       Deque<InnerNode> parents) {
         // TODO: delete value from leaf node (and propagate changes up)
         Integer[] leafKeys = node.getKeys();
-        int numberOfKeys = leafKeys.length;
         int capacity = this.capacity;
         String value = null;
 
+        //get position of key
         int position = -1;
         for(int i=0; i < leafKeys.length; i++){
             if(leafKeys[i] == key){
@@ -391,26 +462,19 @@ public class BPlusTree {
             return null;
         }
 
+        //get value of to be deleted key
+        String []values = node.getValues();
+        value = values[position];
+
+        //delete key
         Integer occupancy = getNodeOccupancy(leafKeys);
-        if(occupancy >= (capacity / 2) + 1){
+        boolean operateOnRoot = parents.size() == 0;
+        if(occupancy >= (capacity / 2) + 1 || operateOnRoot){
             //enough space in leaf available to just delete
-            String []values = node.getValues();
-
-            //get value
-            value = values[position];
-
-            //delete element
-            if(position != numberOfKeys - 1){
-                for(int i=position; i < numberOfKeys - 1; i++){
-                    leafKeys[i] = leafKeys[i + 1];
-                    values[i] = values[i + 1];
-                }
-            }
-            leafKeys[numberOfKeys - 1] = null;
-            values[numberOfKeys - 1] = null;
+            deletePositionOfAssociatedArrays(position, leafKeys, values);
         } else{
             //not enough space so either steal or merge
-            InnerNode parent = parents.getLast();
+            InnerNode parent = parents.getFirst();
             LeafNode leftNeighbor = (LeafNode) getNeighbor(parent, key, false);
             LeafNode rightNeighbor = (LeafNode) getNeighbor(parent, key, true);
             
@@ -418,45 +482,13 @@ public class BPlusTree {
             Integer rightOccupancy = rightNeighbor == null ? 0 : getNodeOccupancy(rightNeighbor.getKeys());
             if(leftOccupancy > (capacity / 2)){
                 //we can steal from left
+                stealFromNeighbor(parents, node, leftNeighbor, position, false);
             } else if(rightOccupancy > (capacity / 2)){
-                //we can steal from right
-                Integer []ownKeys = leafKeys;
-                Integer []neighborKeys = rightNeighbor.getKeys();
-
-                String []ownValues = node.getValues();
-                String []neighborValues = rightNeighbor.getValues();
-
-                //get Value
-                value = ownValues[position];
-
-                //overwrite position with lowest entry in neighbor
-                ownKeys[position] = neighborKeys[0];
-                ownValues[position] = neighborValues[0];
-
-                //adapt parent
-                Integer newParentKey = neighborKeys[1];
-                replaceParentKey(parent, neighborKeys, newParentKey, true);
-                
-                //remove value from neighbor
-                neighborKeys[0] = null;
-                neighborValues[0] = null;
-
-                //set all values
-                node.setKeys(ownKeys);
-                node.setValues(ownValues);
-                rightNeighbor.setKeys(neighborKeys);
-                rightNeighbor.setValues(neighborValues);
-
-                //sort new arrays
-                sortClean(node);
-                sortClean(rightNeighbor);
+                stealFromNeighbor(parents, node, rightNeighbor, position, true);
             } else if(rightNeighbor != null){
                 //merge with right neighbor
                 Integer []ownKeys = leafKeys;
                 String []ownValues = node.getValues();
-
-                //get deletion value
-                value = ownValues[position];
 
                 //deleteElement
                 ownKeys[position] = null;
@@ -474,6 +506,22 @@ public class BPlusTree {
 
             } else if(leftNeighbor != null){
                 //merge with left neighbor
+                Integer []ownKeys = leafKeys;
+                String []ownValues = node.getValues();
+
+                //deleteElement
+                ownKeys[position] = null;
+                ownValues[position] = null;
+
+                //set deletion
+                node.setKeys(ownKeys);
+                node.setValues(ownValues);
+
+                //sort new array
+                sortClean(node);
+
+                //correct bp tree
+                mergeNodes(parent, leftNeighbor, node);
             }
         }
 

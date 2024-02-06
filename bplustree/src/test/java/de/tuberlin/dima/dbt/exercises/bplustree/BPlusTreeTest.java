@@ -181,10 +181,13 @@ public class BPlusTreeTest {
      */
 
 
-     //lookup tests
+    /**
+     * lookup tests
+     * 
+     */
 
-     @Test
-     public void deepLookup() {
+    @Test
+    public void deepLookup() {
          // given
          tree = newTree(newNode(keys(20, 40, 60), nodes(
             newNode(keys(4, 7, 10), nodes(
@@ -213,48 +216,51 @@ public class BPlusTreeTest {
          String value = tree.lookup(49);
          // then
          assertThat(value, is("D"));
-     }
+    }
 
 
-     //add tests
+    /**
+     * add tests
+     * 
+     */
 
-     @Test
-     public void addElementsInitialElement() {
-         // given
-         tree = newTree(newLeaf(new Integer[] {}, new String[] {}));
-         // when
-         tree.insert(1, "a");
-         // then
-         assertThat(tree, isTree(newTree(newLeaf(keys(1), values("a")))));
-     }
+    @Test
+    public void addElementsInitialElement() {
+        // given
+        tree = newTree(newLeaf(new Integer[] {}, new String[] {}));
+        // when
+        tree.insert(1, "a");
+        // then
+        assertThat(tree, isTree(newTree(newLeaf(keys(1), values("a")))));
+    }
 
-     @Test
-     public void addElementsNewLayer() {
-         // given
-         tree = newTree(newLeaf(keys(1, 2, 3), values("a", "b", "c")));
-         // when
-         tree.insert(4, "d");
-         tree.insert(5, "e");
-         // then
-         assertThat(tree, isTree(newTree(newNode(keys(3), nodes(
+    @Test
+    public void addElementsNewLayer() {
+        // given
+        tree = newTree(newLeaf(keys(1, 2, 3), values("a", "b", "c")));
+        // when
+        tree.insert(4, "d");
+        tree.insert(5, "e");
+        // then
+        assertThat(tree, isTree(newTree(newNode(keys(3), nodes(
             newLeaf(keys(1, 2), values("a", "b")),
             newLeaf(keys(3, 4, 5), values("c", "d", "e")))))));
-     }
+    }
 
-     @Test
-     public void addElementSplitInner() {
-         // given
-         tree = newTree(newNode(keys(4, 7, 10, 13), nodes(
+    @Test
+    public void addElementSplitInner() {
+        // given
+        tree = newTree(newNode(keys(4, 7, 10, 13), nodes(
             newLeaf(keys(1, 2, 3), values("a", "b", "c")),
             newLeaf(keys(4, 5, 6), values("d", "e", "f")),
             newLeaf(keys(7, 8, 9), values("g", "h", "i")),
             newLeaf(keys(10, 11, 12), values("j", "k", "l")),
             newLeaf(keys(13, 14, 15, 16), values("m", "n", "o", "p"))
-         )));
-         // when
-         tree.insert(17, "q");
-         // then
-         assertThat(tree, isTree(newTree(newNode(keys(10), nodes(
+        )));
+        // when
+        tree.insert(17, "q");
+        // then
+        assertThat(tree, isTree(newTree(newNode(keys(10), nodes(
             newNode(keys(4, 7), nodes(
                 newLeaf(keys(1, 2, 3), values("a", "b", "c")),
                 newLeaf(keys(4, 5, 6), values("d", "e", "f")),
@@ -264,11 +270,12 @@ public class BPlusTreeTest {
                 newLeaf(keys(10, 11, 12), values("j", "k", "l")),
                 newLeaf(keys(13, 14), values("m", "n")),
                 newLeaf(keys(15, 16, 17), values("o", "p", "q"))
-            )))))));
-     }
+            ))
+        )))));
+    }
 
-     @Test
-     public void addManyElements(){
+    @Test
+    public void addManyElements(){
         // given
         tree = newTree(newLeaf(new Integer[] {}, new String[] {}));
         // when
@@ -311,11 +318,11 @@ public class BPlusTreeTest {
                     newLeaf(keys(35,36,37), values("abc","abc","abc"))
                 ))
             ))
-         )))));
-     }
+        )))));
+    }
 
-     @Test
-     public void addElementsCenter(){
+    @Test
+    public void addElementsCenter(){
         // given
         tree = newTree(newLeaf(new Integer[] {}, new String[] {}));
         // when
@@ -334,10 +341,10 @@ public class BPlusTreeTest {
             newLeaf(keys(3, 10), values("abc", "abc")),
             newLeaf(keys(11, 12, 50), values("abc", "abc", "abc")),
             newLeaf(keys(51, 52, 53), values("abc", "abc", "abc")))))));
-     }
+    }
 
-     @Test
-     public void addElementsNotDefaultSize(){
+    @Test
+    public void addElementsNotDefaultSize(){
          // given
          int testCapacity = 6;
          tree = new BPlusTree(new LeafNode(new Integer[] {1,2,3,4}, new String[] {"abc","abc","abc","abc"}, testCapacity), testCapacity);
@@ -347,23 +354,75 @@ public class BPlusTreeTest {
          assertThat(tree, isTree(new BPlusTree(
             new LeafNode(new Integer[] {1,2,3,4,5}, new String[] {"abc","abc","abc","abc","abc"}, testCapacity), testCapacity
             )));
-     }
+    }
 
-     @Test
-     public void addElementsSplitNotDefaultSize(){
-         // given
-         int testCapacity = 6;
-         tree = new BPlusTree(new LeafNode(new Integer[] {1,2,3,4,5,6}, new String[] {"abc","abc","abc","abc","abc","abc",}, testCapacity), testCapacity);
-         // when
-         tree.insert(7, "abc");
-         // then
-         assertThat(tree, isTree(new BPlusTree(
+    @Test
+    public void addElementsSplitNotDefaultSize(){
+        // given
+        int testCapacity = 6;
+        tree = new BPlusTree(new LeafNode(new Integer[] {1,2,3,4,5,6}, new String[] {"abc","abc","abc","abc","abc","abc",}, testCapacity), testCapacity);
+        // when
+        tree.insert(7, "abc");
+        // then
+        assertThat(tree, isTree(new BPlusTree(
             new InnerNode(new Integer[] {4}, new Node[]{
                 new LeafNode(new Integer[] {1,2,3}, new String[] {"abc","abc","abc"}, testCapacity),
                 new LeafNode(new Integer[] {4,5,6,7}, new String[] {"abc","abc","abc","abc"}, testCapacity)
             },testCapacity), testCapacity)));
-     }
+    }
 
-     //delete tests
+    /**
+     * delete tests
+     * 
+     */
 
+    @Test
+    public void deleteFromChildStealFromLeftSibling() {
+        // given
+        tree = newTree(newNode(
+                 keys(4), nodes(newLeaf(keys(1, 2, 3), values("a", "b", "c")),
+                                newLeaf(keys(4, 5), values("d", "e")))));
+        // when
+        String value = tree.delete(4);
+        // then
+        assertThat(value, is("d"));
+        assertThat(tree, isTree(newTree(newNode(
+                 keys(3), nodes(newLeaf(keys(1, 2), values("a", "b")),
+                                newLeaf(keys(3, 5), values("c", "e")))))));
+ 
+    }
+
+    @Test
+    public void deleteFromChildMergeWithLeftSibling() {
+        // given
+        tree = newTree(newNode(keys(3, 5),
+                               nodes(newLeaf(keys(1, 2), values("a", "b")),
+                                     newLeaf(keys(3, 4), values("c", "d")),
+                                     newLeaf(keys(5, 6), values("e", "f")))));
+        // when
+        String value = tree.delete(5);
+        // then
+        assertThat(value, is("e"));
+        assertThat(tree, isTree(newTree(newNode(
+                keys(3), nodes(newLeaf(keys(1, 2), values("a", "b")),
+                               newLeaf(keys(3, 4, 6), values("c", "d", "f")))))));
+    }
+
+    @Test
+    public void deleteHoleTree() {
+        // given
+        tree = newTree(newNode(keys(4, 7, 10, 13), nodes(
+            newLeaf(keys(1, 2, 3), values("a", "b", "c")),
+            newLeaf(keys(4, 5, 6), values("d", "e", "f")),
+            newLeaf(keys(7, 8, 9), values("g", "h", "i")),
+            newLeaf(keys(10, 11, 12), values("j", "k", "l")),
+            newLeaf(keys(13, 14, 15, 16), values("m", "n", "o", "p"))
+        )));
+        // when
+        for(int i=1; i<17; i++){
+            tree.delete(i);
+        }
+        // then
+        assertThat(tree, isTree(newTree(newLeaf(keys(), values()))));
+    }
 }
