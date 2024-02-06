@@ -78,31 +78,108 @@ public class BPlusTree {
         return null;
     }
 
-    private void insertSort(Integer[] leafKeys, String[] values, Integer newKey, String newValue){
-        //make sure there is space
-        assert leafKeys[leafKeys.length -1] == null;
+    /**
+     * Insert value into leaf node (and propagate changes up)
+     */
+    private void insertIntoLeafNode(Integer key, String value, LeafNode node, Deque<InnerNode> parents){
+        Integer[] leafKeys = node.getKeys();
+        String[] leafValues = node.getValues();
 
-        int position = 0;
-        for(int i=0; i<leafKeys.length; i++){
-            if(leafKeys[i] == null){
-                leafKeys[i] = newKey;
-                values[i] = newValue;
-                return;
-            }
-            if(leafKeys[i] > newKey){
-                position = i;
-                break;
-            }
+        if(getNodeOccupancy(leafKeys) < this.capacity){
+            //add new element at the end
+            leafKeys[this.capacity - 1] = key;
+            leafValues[this.capacity - 1] = value;
+
+            //set keys and values
+            node.setKeys(leafKeys);
+            node.setValues(leafValues);
+
+            //sort new node
+            sortClean(node);
+
+        }else{
+            //not enough space -> split leaf
+            int middle = this.capacity / 2;
+            Integer []tmpKeys =  Arrays.copyOf(leafKeys, this.capacity + 2);
+            String []tmpValues =  Arrays.copyOf(leafValues, this.capacity + 2);
+            tmpKeys[this.capacity + 1] = key;
+            tmpValues[this.capacity + 1] = value;
+            LeafNode tmpLeaf = new LeafNode(tmpKeys, tmpValues, this.capacity + 2);
+            sortClean(tmpLeaf);
+
+            //copy results to right nodes
+            //existing leaf
+            leafKeys = new Integer[this.capacity];
+            leafValues = new String[this.capacity];
+            System.arraycopy(tmpLeaf.getKeys(), 0, leafKeys, 0, middle);
+            System.arraycopy(tmpLeaf.getValues(), 0, leafValues, 0, middle);
+
+            //new parent Value
+            Integer newParentValue = tmpLeaf.getKeys()[middle];
+
+            //new leaf
+            Integer []newKeys = new Integer[this.capacity];
+            String []newValues = new String[this.capacity];
+            System.arraycopy(tmpLeaf.getKeys(), middle, newKeys, 0, middle + 1);
+            System.arraycopy(tmpLeaf.getValues(), middle, newValues, 0, middle + 1);
+            LeafNode newLeaf = new LeafNode(newKeys, newValues, this.capacity);
+
+            //set keys and values
+            node.setKeys(leafKeys);
+            node.setValues(leafValues);
+            
+            //update parent
+            updateParentInsert(parents, newParentValue, node, newLeaf);
         }
-        //copy array to the right and discard last element of array
-        for(int i=leafKeys.length - 2; i >= position; i--){
-            leafKeys[i] = leafKeys[i - 1];
-            values[i] = values[i - 1];
-        }
-        //insert new key
-        leafKeys[position] = newKey;
-        values[position] = newValue;
     }
+
+    private void updateParentInsert(Deque<InnerNode> parents, Integer newKey, Node leftNode, Node rightNode){
+        //right node is new
+        int parentsSize = parents.size();
+        if(parentsSize == 0){
+            Integer[] innerKeys = Arrays.copyOf(new Integer[] {}, this.capacity);
+            innerKeys[0] = newKey;
+            Node[] children = Arrays.copyOf(new Node[] {}, this.capacity + 1);
+            children[0] = leftNode;
+            children[1] = rightNode;
+            InnerNode newNode = new InnerNode(innerKeys, children, this.capacity);
+            this.root = newNode;
+            return;
+        } 
+        
+        InnerNode parent = parents.getFirst();
+        Node []children = parent.getChildren();
+        Integer []innerKeys = parent.getKeys();
+        if(getNodeOccupancy(parent.getKeys()) == this.capacity){
+            Integer[] oversizeKeys = Arrays.copyOf(innerKeys, this.capacity + 1);
+            Node[] oversizeChildren = Arrays.copyOf(children, this.capacity + 2);
+            insertSortNode(oversizeKeys, oversizeChildren, newKey, rightNode);
+
+            //get Key for parent
+            int middle = this.capacity / 2;
+            Integer middleKey = oversizeKeys[middle];
+
+            //split inner node and push middle key up
+            parent.setKeys(Arrays.copyOfRange(oversizeKeys, 0, middle));
+            parent.setChildren(Arrays.copyOfRange(oversizeChildren, 0, middle + 1));
+
+            //copy upper half exept middle key to new inner node
+            Integer []newKeys = Arrays.copyOfRange(oversizeKeys, middle + 1, this.capacity + 1);
+            Node []newChildren = Arrays.copyOfRange(oversizeChildren, middle + 1, this.capacity + 2);
+            InnerNode newNode = new InnerNode(newKeys, newChildren, this.capacity);
+
+            //update parent
+            parents.removeFirst();
+            updateParentInsert(parents, middleKey, parent, newNode);
+        } else{
+            insertSortNode(innerKeys, children, newKey, rightNode);
+
+            //set children and keys
+            parent.setChildren(children);
+            parent.setKeys(innerKeys);
+        }
+    }
+
 
     private void insertSortNode(Integer[] NodeKeys, Node[] nodes, Integer newKey, Node newNode){
         //make sure there is space
@@ -128,53 +205,6 @@ public class BPlusTree {
         //insert new key
         NodeKeys[position] = newKey;
         nodes[position + 1] = newNode;
-    }
-
-    /**
-     * Insert value into leaf node (and propagate changes up)
-     */
-    private void insertIntoLeafNode(Integer key, String value,
-                                    LeafNode node, Deque<InnerNode> parents) {
-        Integer[] leafKeys = node.getKeys();
-        int numberOfKeys = leafKeys.length;
-        if(leafKeys[numberOfKeys - 1] == null){
-            //space in leaf available
-            String []values = node.getValues();
-            insertSort(leafKeys, values, key, value);
-            node.setKeys(leafKeys);
-            node.setValues(values);
-        } else{
-            //no space in leaf available
-            //insert into oversize array first and split later
-            int oversize = numberOfKeys + 1;
-            Integer[] oversizeKeys = Arrays.copyOf(leafKeys, oversize);
-            String[] oversizeValues = Arrays.copyOf(node.getValues(), oversize);
-            insertSort(oversizeKeys, oversizeValues, key, value);
-
-            //get the middle info
-            int middle = (int) (oversize / 2);
-            Integer middleValue = oversizeKeys[middle];
-
-            //set initial leaf with lower half values
-            node.setKeys(Arrays.copyOfRange(oversizeKeys, 0, middle));
-            node.setValues(Arrays.copyOfRange(oversizeValues, 0, middle));
-
-            //create new Leaf from upper half
-            Integer []newKeys = Arrays.copyOfRange(oversizeKeys, middle, oversize);
-            String []newValues = Arrays.copyOfRange(oversizeValues, middle, oversize);
-            LeafNode newLeaf = new LeafNode(newKeys, newValues, numberOfKeys);
-
-            //add new Value to Inner Node
-            InnerNode parent = parents.getLast();
-            Node []children = parent.getChildren();
-            Integer []innerKeys = parent.getKeys();
-            insertSortNode(innerKeys, children, middleValue, newLeaf);
-
-            //set children and keys
-            parent.setChildren(children);
-            parent.setKeys(innerKeys);
-        }
-
     }
 
     private int getNodeOccupancy(Object[] keys){
