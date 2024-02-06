@@ -425,4 +425,34 @@ public class BPlusTreeTest {
         // then
         assertThat(tree, isTree(newTree(newLeaf(keys(), values()))));
     }
+
+    /**
+     * Eval server error
+     */
+
+     @Test
+     public void firstEvalTest() {
+         // given
+         tree = newTree(newNode(keys(130,156,169,198), nodes(
+             newLeaf(keys(114,124), values("QPw","qyP")),
+             newLeaf(keys(130,146), values("NWM","Aak")),
+             newLeaf(keys(156,163), values("eWo","lfZ")),
+             newLeaf(keys(169,183), values("MoQ","oKk")),
+             newLeaf(keys(198,207), values("QVs","ihL"))
+         )));
+         // when
+         String value = tree.lookup(207);
+         // then
+         assertThat(value, is("ihL"));
+     }
+
+     @Test 
+     public void thirdEvalTest(){
+        // given
+        tree = newTree(newLeaf(keys(98,117,125,128), values("McL","emy","KAo","EZw")));
+        // when
+        String value = tree.delete(128);
+        // then
+        assertThat(value, is("EZw"));
+     }
 }

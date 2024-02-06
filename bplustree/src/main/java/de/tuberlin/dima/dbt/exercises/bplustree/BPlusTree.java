@@ -69,9 +69,10 @@ public class BPlusTree {
      * @return The stored value, or {null} if the key does not exist.
      */
     private String lookupInLeafNode(Integer key, LeafNode node) {
-        int numberOfKeys = node.keys.length;
+        Integer[] leafKeys = node.getKeys();
+        int numberOfKeys = leafKeys.length;
         for(int i=0; i<numberOfKeys; i++){
-            if(node.keys[i] == key){
+            if(key.equals(leafKeys[i])){
                 return node.getValues()[i];
             }
         }
@@ -370,7 +371,7 @@ public class BPlusTree {
 
         //delete key and right node
         Node[] children = parent.getChildren();
-        Integer parentOccupancy = getNodeOccupancy(parentKeys);
+        int parentOccupancy = getNodeOccupancy(parentKeys);
         if(parentOccupancy == 1){
             //merged last existing leafnodes -> set root
             this.root = leftNode;
@@ -453,7 +454,7 @@ public class BPlusTree {
         //get position of key
         int position = -1;
         for(int i=0; i < leafKeys.length; i++){
-            if(leafKeys[i] == key){
+            if(key.equals(leafKeys[i])){
                 position = i;
                 break;
             }
@@ -467,7 +468,7 @@ public class BPlusTree {
         value = values[position];
 
         //delete key
-        Integer occupancy = getNodeOccupancy(leafKeys);
+        int occupancy = getNodeOccupancy(leafKeys);
         boolean operateOnRoot = parents.size() == 0;
         if(occupancy >= (capacity / 2) + 1 || operateOnRoot){
             //enough space in leaf available to just delete
